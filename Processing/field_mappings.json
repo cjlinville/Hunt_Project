@@ -1,0 +1,116 @@
+{
+  "hunting_district.geojson": {
+    "source": "Montana FWP",
+    "type": "polygon",
+    "field_map": {
+      "HD_ID": "unit_id",
+      "SPECIES": "species",
+      "NAME": "unit_name"
+    },
+    "value_maps": {}
+  },
+  "public_lands.geojson": {
+    "source": "Montana FWP Public Lands",
+    "type": "polygon",
+    "field_map": {
+      "SITETYPE": "owner_type",
+      "SITENAME": "agency",
+      "PUBLIC_ACCESS": "public_access"
+    },
+    "value_maps": {}
+  },
+  "parcels.geojson": {
+    "source": "Montana Parcels",
+    "type": "polygon",
+    "field_map": {
+      "OwnerName": "Owner",
+      "TotalValue": "Total_Value"
+    },
+    "value_maps": {}
+  },
+  "mt_roads.geojson": {
+    "source": "Montana MSDI Transportation",
+    "type": "network",
+    "field_map": {
+      "LSt_Name": "Name",
+      "ROADCLASS": "Road_Class",
+      "SURFACE": "surface",
+      "ACCESS": "motorized_access"
+    },
+    "value_maps": {
+      "motorized_access": {
+        "Y": "yes",
+        "N": "no",
+        "OPEN": "yes",
+        "CLOSED": "no"
+      }
+    }
+  },
+  "fs_trails.geojson": {
+    "source": "USFS Trails",
+    "type": "network",
+    "field_map": {
+      "TRAIL_NAME": "Name",
+      "TRAIL_TYPE": "Trail_Type",
+      "TERRA_MOTORIZED": "Motorized Use",
+      "SNOW_MOTORIZED": "Snowmobile Use"
+    },
+    "value_maps": {}
+  },
+  "nhd_flowline.geojson": {
+    "source": "USGS NHD",
+    "type": "network",
+    "field_map": {
+      "GNIS_NAME": "Name"
+    },
+    "value_maps": {}
+  },
+  "nhd_waterbody.geojson": {
+    "source": "USGS NHD",
+    "type": "polygon",
+    "field_map": {
+      "GNIS_NAME": "Name"
+    },
+    "value_maps": {}
+  },
+  "nhd_area.geojson": {
+    "source": "USGS NHD",
+    "type": "polygon",
+    "field_map": {
+      "GNIS_NAME": "Name",
+      "FTYPE": "Water_Type"
+    },
+    "value_maps": {}
+  },
+  "distribution.geojson": {
+    "source": "Montana FWP",
+    "type": "polygon",
+    "field_map": {
+      "USETYPE": "Range"
+    },
+    "value_maps": {
+      "Range": {
+        "G": "General Range",
+        "GW": "Winter Range"
+      }
+    }
+  },
+  "elevation_bands.geojson": {
+    "source": "Calculated",
+    "type": "polygon",
+    "field_map": {
+      "band_id": "band_id"
+    },
+    "value_maps": {}
+  },
+  "slope_mask.geojson": {
+    "source": "Calculated",
+    "type": "polygon",
+    "field_map": {
+      "slope_class": "slope_class",
+      "label": "label",
+      "min_deg": "min_deg"
+    },
+    "value_maps": {}
+  }
+}

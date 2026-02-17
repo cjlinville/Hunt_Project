@@ -1,0 +1,315 @@
+import requests
+import geopandas as gpd
+from shapely.geometry import shape, box
+import os
+from pathlib import Path
+
+# The national map access api info
+TNM_PRODUCTS_URL = "https://tnmaccess.nationalmap.gov/api/v1/products"
+DATASET_NAME = "National Elevation Dataset (NED) 1/3 arc-second"
+PRODUCT_FORMAT = "GeoTIFF"
+MAX_ITEMS = 200
+
+def tnm_search_dem_tiles(bbox):
+    """
+    Returns a list of download URLs for DEM tiles that intersect the bbox.
+    bbox: (min_lon, min_lat, max_lon, max_lat) in WGS84
+    """
+    bbox_str = ",".join(str(v) for v in bbox)
+
+    urls = []
+    offset = 0
+
+    while True:
+        params = {
+            "datasets": DATASET_NAME,
+            "prodFormats": PRODUCT_FORMAT,
+            "bbox": bbox_str,
+            "outputFormat": "JSON",
+            "max": str(MAX_ITEMS),
+            "offset": str(offset),
+        }
+
+        r = requests.get(TNM_PRODUCTS_URL, params=params, timeout=120)
+        r.raise_for_status()
+        data = r.json()
+
+        items = data.get("items", [])
+        if not items:
+            break
+
+        for item in items:
+            url = item.get("downloadURL")
+            if url:
+                urls.append(url)
+
+        if len(items) < MAX_ITEMS:
+            break
+
+        offset += MAX_ITEMS
+
+    return urls
+
+
+def download_file(url, out_path):
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if out_path.exists() and out_path.stat().st_size > 0:
+        return out_path
+
+    with requests.get(url, stream=True, timeout=300) as r:
+        r.raise_for_status()
+        with open(out_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    f.write(chunk)
+
+    return out_path
+
+def get_hunting_district(config):
+    url = config['URLS']['Hunting_Districts']
+    query = f"NAME = '{config['unit']['District_ID']}'"
+    
+    query_url = f"{url}/query"
+
+    params = {
+        "where": query,
+        "outFields": "*",
+        "returnGeometry": "true",
+        "f": "geojson",
+        "outSR": 4326
+    }
+
+    response = requests.get(query_url, params=params)
+    response.raise_for_status()
+    data = response.json()
+
+    if not data.get("features"):
+        raise ValueError(f"No features found for District_ID: {config['unit']['District_ID']}")
+
+    gdf = gpd.read_file(requests.compat.json.dumps(data))
+    gdf.crs = "EPSG:4326"
+    return gdf
+
+def download_nhd_layer(config, layer_id, bbox):
+    """Downloads NHD data for a specific layer within a bounding box."""
+    base_url = config['URLS']['NHD_MAPSERVER']
+    query_url = f"{base_url}/{layer_id}/query"
+    
+    west, south, east, north = bbox
+    
+    all_features = []
+    result_offset = 0
+    page_size = 2000
+
+    while True:
+        params = {
+            "f": "geojson",
+            "where": "1=1",
+            "outFields": "*",
+            "returnGeometry": "true",
+            "geometry": f"{west},{south},{east},{north}",
+            "geometryType": "esriGeometryEnvelope",
+            "spatialRel": "esriSpatialRelIntersects",
+            "inSR": 4326,
+            "outSR": 4326,
+            "resultOffset": result_offset,
+            "resultRecordCount": page_size,
+        }
+
+        resp = requests.get(query_url, params=params, timeout=120)
+        resp.raise_for_status()
+        gj = resp.json()
+
+        features = gj.get("features", [])
+        if not features:
+            break
+
+        all_features.extend(features)
+
+        if len(features) < page_size:
+            break
+
+        result_offset += page_size
+
+    if not all_features:
+        return gpd.GeoDataFrame(columns=['geometry'], crs="EPSG:4326")
+
+    gdf = gpd.GeoDataFrame.from_features(
+        {"type": "FeatureCollection", "features": all_features},
+        crs="EPSG:4326",
+    )
+    return gdf
+
+def get_nhd_data(config, district_gdf):
+    """Fetches NHD data for Flowlines, Areas, and Waterbodies and clips them."""
+    # Get bounding box of the district
+    bbox = district_gdf.total_bounds
+    district_geom = district_gdf.unary_union
+    
+    # Layer IDs: 6 (Flowline), 9 (Area), 12 (Waterbody)
+    layers = {
+        "Flowline": 6,
+        "Area": 9,
+        "Waterbody": 12
+    }
+    
+    nhd_results = {}
+    
+    for layer_name, layer_id in layers.items():
+        print(f"Downloading NHD {layer_name}...")
+        layer_gdf = download_nhd_layer(config, layer_id, bbox)
+        
+        if not layer_gdf.empty:
+            print(f"Clipping {layer_name} to district boundary...")
+            # Clip to the exact district geometry
+            clipped_gdf = gpd.clip(layer_gdf, district_geom)
+            nhd_results[layer_name] = clipped_gdf
+        else:
+            nhd_results[layer_name] = layer_gdf
+            
+    return nhd_results
+
+def fetch_arcgis_features(service_url, district_gdf, layer_name):
+    """Generic fetcher for ArcGIS Feature/Map Services with spatial query and clipping."""
+    bbox = district_gdf.total_bounds
+    district_geom = district_gdf.unary_union
+    
+    query_url = f"{service_url}/query"
+    west, south, east, north = bbox
+    
+    print(f"Downloading {layer_name}...")
+    all_features = []
+    result_offset = 0
+    page_size = 2000
+
+    while True:
+        params = {
+            "f": "geojson",
+            "where": "1=1",
+            "outFields": "*",
+            "returnGeometry": "true",
+            "geometry": f"{west},{south},{east},{north}",
+            "geometryType": "esriGeometryEnvelope",
+            "spatialRel": "esriSpatialRelIntersects",
+            "inSR": 4326,
+            "outSR": 4326,
+            "resultOffset": result_offset,
+            "resultRecordCount": page_size,
+        }
+
+        resp = requests.get(query_url, params=params, timeout=120)
+        resp.raise_for_status()
+        gj = resp.json()
+
+        features = gj.get("features", [])
+        if not features:
+            break
+
+        all_features.extend(features)
+
+        if len(features) < page_size:
+            break
+
+        result_offset += page_size
+
+    if not all_features:
+        return gpd.GeoDataFrame(columns=['geometry'], crs="EPSG:4326")
+
+    layer_gdf = gpd.GeoDataFrame.from_features(
+        {"type": "FeatureCollection", "features": all_features},
+        crs="EPSG:4326",
+    )
+    
+    print(f"Clipping {layer_name} to district boundary...")
+    clipped_gdf = gpd.clip(layer_gdf, district_geom)
+    return clipped_gdf
+
+def main(config):
+    config_dir = Path(__file__).parent.parent
+    raw_data_dir = config_dir / config['environment']['raw_data_dir']
+    raw_data_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Fetching Hunting District {config['unit']['District_ID']}...")
+    district_gdf = get_hunting_district(config)
+    dist_path = raw_data_dir / "hunting_district.geojson"
+    district_gdf.to_file(dist_path, driver="GeoJSON")
+    print(f"Saved district to {dist_path}")
+
+    
+    # calculate buffered geom
+    buffer_miles = config['unit'].get('buffer_distance_miles', 1.0)
+    print(f"Buffering district by {buffer_miles} miles for context...")
+    
+    # Reproject to Montana State Plane (EPSG:32100) for accurate meters buffering
+    district_projected = district_gdf.to_crs("EPSG:32100")
+    buffered_series = district_projected.buffer(buffer_miles * 1609.34) # Convert miles to meters
+    buffered_gdf = gpd.GeoDataFrame(geometry=buffered_series.to_crs("EPSG:4326"))
+    
+    # Process generic feature services
+    if 'Feature_Services' in config['URLS']:
+        for service in config['URLS']['Feature_Services']:
+            name = service['name']
+            url = service['url']
+            
+            # Use buffered_gdf for fetching data
+            gdf = fetch_arcgis_features(url, buffered_gdf, name)
+            
+            if not gdf.empty:
+                file_name = name.lower()
+                    
+                out_path = raw_data_dir / f"{file_name}.geojson"
+                gdf.to_file(out_path, driver="GeoJSON")
+                print(f"Saved {name} as {file_name} to {out_path}")
+            else:
+                print(f"No {name} data found in this area.")
+
+    # NHD Data (special case with multiple layers, flowline,. lakes/ponds)
+    nhd_data = get_nhd_data(config, buffered_gdf)
+    
+    for layer_name, gdf in nhd_data.items():
+        if not gdf.empty:
+            out_path = raw_data_dir / f"nhd_{layer_name.lower()}.geojson"
+            gdf.to_file(out_path, driver="GeoJSON")
+            print(f"Saved {layer_name} to {out_path}")
+        else:
+            print(f"No {layer_name} data found in this area.")
+
+    # ---------------------------
+    # DEM Tiles (TNM)
+    # ---------------------------
+    print(f"Searching TNM for DEM tiles (Buffer: {buffer_miles} miles)...")
+    # Use the buffered bbox for DEM search
+    total_bounds = buffered_gdf.total_bounds
+    # total_bounds is (minx, miny, maxx, maxy)
+    
+    try:
+        urls = tnm_search_dem_tiles(total_bounds)
+    except Exception as e:
+        print(f"Error searching TNM: {e}")
+        urls = []
+
+    if urls:
+        print(f"Found {len(urls)} DEM tiles. Downloading...")
+        dem_tiles_dir = raw_data_dir / "dem_tiles"
+        dem_tiles_dir.mkdir(parents=True, exist_ok=True)
+        
+        for url in urls:
+            fname = url.split("/")[-1].split("?")[0]
+            if not fname.lower().endswith((".tif", ".tiff")):
+                fname += ".tif"
+            out_path = dem_tiles_dir / fname
+            download_file(url, out_path)
+            # print(f"Downloaded: {fname}") # reduce spam
+        print(f"Downloaded {len(urls)} tiles to {dem_tiles_dir}")
+    else:
+        print("No DEM tiles found.")
+
+if __name__ == "__main__":
+    import yaml
+    # Load config for standalone execution if needed, 
+    # but usually main is called from elsewhere.
+    config_path = Path(__file__).parent.parent.parent / "config.yaml"
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+    main(config)

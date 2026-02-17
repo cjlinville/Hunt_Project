@@ -1,0 +1,37 @@
+unit:
+  District_ID: 423
+  Species: bighorn_sheep
+  buffer_distance_miles: 1.0
+
+steps:
+  get_data: false
+  terrain_derivatives: true
+  process_data: true
+  push_to_map: true
+
+environment:
+  raw_data_dir: "Data/Raw"
+  processed_data_dir: "Data/Processed"
+  map_data_dir: "../frontend/public/data"
+  osgeo_path: "C:\\OSGEO4W"
+
+URLS:
+  Hunting_Districts: "https://services3.arcgis.com/Cdxz8r11hT0MGzg1/arcgis/rest/services/ADMBND_HD_SHEEP/FeatureServer/0"
+  NHD_MAPSERVER: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer"
+
+  NAIP: "https://gisservicemt.gov/arcgis/rest/services/MSDI_Framework/NAIP_{year}/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png&transparent=true&f=image"
+  
+  Feature_Services:
+    - name: "FS_Trails"
+      url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_TrailNFSPublish_01/MapServer/0"
+    - name: "Public_Lands"
+      url: "https://services3.arcgis.com/Cdxz8r11hT0MGzg1/arcgis/rest/services/FWPLND_FWPLANDS_PARCELS/FeatureServer/0"
+    - name: "MT_Roads"
+      url: "https://gisservicemt.gov/arcgis/rest/services/MSDI_Framework/MontanaTransportation/MapServer/0"
+    - name: "distribution"
+      url: "https://services3.arcgis.com/Cdxz8r11hT0MGzg1/arcgis/rest/services/WILD_DISTRIB_BIGHORNSHEEP/FeatureServer/0"
+    - name: "Parcels"
+      url: "https://gisservicemt.gov/arcgis/rest/services/MSDI_Framework/Parcels/MapServer/0"
+
+
+
