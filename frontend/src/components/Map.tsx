@@ -206,6 +206,24 @@ const nhdWaterbodyOutlineLayer = {
     }
 };
 
+const nhdWaterbodyLabelLayer: any = {
+    id: 'nhd-waterbody-label',
+    type: 'symbol',
+    layout: {
+        'text-field': ['get', 'Name'],
+        'text-size': 11,
+        'text-font': ['Open Sans Italic', 'Arial Unicode MS Regular'],
+        'text-anchor': 'center',
+        'text-max-width': 8
+    },
+    paint: {
+        'text-color': '#1d4ed8', // Blue-700
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 2
+    },
+    minzoom: 13
+};
+
 const nhdFlowlineLayer = {
     id: 'nhd-flowline',
     type: 'line' as const,
@@ -591,6 +609,7 @@ export function MapComponent({
                                 <Source id="nhd-waterbodies" type="geojson" data={NHD_WATERBODY_URL}>
                                     <Layer {...nhdWaterbodyFillLayer} />
                                     <Layer {...nhdWaterbodyOutlineLayer} />
+                                    <Layer {...nhdWaterbodyLabelLayer} />
                                 </Source>
                                 <Source id="nhd-flowlines" type="geojson" data={NHD_FLOWLINE_URL}>
                                     <Layer {...nhdFlowlineLayer} />
@@ -750,6 +769,6 @@ export function MapComponent({
                     )}
                 </button>
             </div>
-        </div>
+        </div >
     );
 }
