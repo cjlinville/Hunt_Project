@@ -253,11 +253,14 @@ const elevationBandsLayer: any = {
             'interpolate',
             ['linear'],
             ['get', 'band_id'],
-            1, '#1a4301', // Dark Green
-            5, '#4d7c0f', // Lime-700
-            10, '#fef3c7', // Amber-100
-            15, '#d4d4d8', // Zinc-300
-            20, '#ffffff'  // White
+            1, '#228B22', // ForestGreen (Low elevation)
+            3, '#9ACD32', // YellowGreen
+            5, '#F4A460', // SandyBrown
+            7, '#8B4513', // SaddleBrown
+            10, '#A0522D', // Sienna
+            12, '#CD853F', // Peru
+            15, '#D3D3D3', // LightGray
+            20, '#FFFFFF'  // White (High peaks)
         ] as any,
         'fill-opacity': 0.5
     }

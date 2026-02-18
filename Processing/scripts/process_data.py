@@ -215,23 +215,34 @@ def process_topography(config, schema_config):
     )
     print(f"Saved {processed_dir}/dem_clipped.tif")
 
-    # Calculate Slope
-    print("\nCalculating slope...")
-    slope_deg = habitat_suitability_index.compute_slope_degrees(dem, res_x, res_y)
-    habitat_suitability_index.write_geotiff(
-        str(processed_dir / "slope_degrees.tif"), 
-        slope_deg, 
-        profile
-    )
-    print(f"Saved {processed_dir}/slope_degrees.tif")
+    # 2. Reproject DEM to Web Mercator (EPSG:3857) for metric processing using GDAL
+    dem_3857_path = processed_dir / "dem_3857.tif"
+    print("Reprojecting DEM to Web Mercator (EPSG:3857) via GDAL...")
+    habitat_suitability_index.reproject_raster_gdal(processed_dir / "dem_clipped.tif", dem_3857_path, "EPSG:3857")
 
-    # Calculate Slope Raster Mask (> 45 degrees)
-    slope_mask = (slope_deg > 45.0).astype("float32")
-    slope_mask[np.isnan(slope_deg)] = np.nan
+    # 3. Calculate Slope in 3857 via GDAL
+    slope_3857_path = processed_dir / "slope_3857.tif"
+    print("Calculating slope via GDAL (EPSG:3857)...")
+    habitat_suitability_index.calculate_slope_gdal(dem_3857_path, slope_3857_path)
+
+    # Load 3857 Slope for Masking
+    with rasterio.open(slope_3857_path) as src:
+        slope_deg = src.read(1, masked=True)
+        # Use specific 3857 variables so we don't overwrite original DEM params
+        transform_3857 = src.transform
+        crs_3857 = src.crs 
+        profile_3857 = src.profile
+
+    # Calculate Slope Raster Mask (> 40 degrees)
+    # Ensure we use filled array for comparison if masked
+    slope_arr = slope_deg.filled(np.nan) if hasattr(slope_deg, "filled") else slope_deg
+    slope_mask = (slope_arr > 35.0).astype("float32")
+    slope_mask[np.isnan(slope_arr)] = np.nan
+    
     habitat_suitability_index.write_geotiff(
         str(processed_dir / "slope_mask.tif"), 
         slope_mask, 
-        profile
+        profile_3857
     )
     print(f"Saved {processed_dir}/slope_mask.tif")
 
@@ -239,7 +250,7 @@ def process_topography(config, schema_config):
     # Vector Generation (Elevation Bands & Slope Mask GeoJSON)
     # ---------------------------------------------------------
     
-    # Elevation Bands
+    # Elevation Bands - Uses original DEM and Transform
     min_elev = float(np.min(dem[~np.isnan(dem)]))
     max_elev = float(np.max(dem[~np.isnan(dem)]))
     print(f"Elevation range: {min_elev:.1f} - {max_elev:.1f} m")
@@ -273,20 +284,21 @@ def process_topography(config, schema_config):
     elev_gdf.to_file(processed_dir / elev_name, driver="GeoJSON")
     print(f"Saved {processed_dir}/{elev_name}")
 
-    # Slope Mask Vector (> 45 degrees)
+    # Slope Mask Vector (> 40 degrees)
     # Re-use slope_deg but handle NaNs for classification
     slope_for_vec = slope_deg.copy()
     slope_for_vec[np.isnan(slope_for_vec)] = -9999
     
     slope_mask_class = np.zeros(slope_for_vec.shape, dtype=np.uint8)
-    slope_mask_class[slope_for_vec > 45] = 1
+    slope_mask_class[slope_for_vec > 40] = 1
     
     def slope_props(val):
-        return {"label": "> 45 degrees", "min_deg": 45}
+        return {"label": "> 40 degrees", "min_deg": 40}
 
     print("Vectorizing slope mask...")
-    slope_vec_gdf = vectorize_raster(slope_mask_class, transform, dem_crs, "slope_class", slope_props)
-    slope_vec_gdf = gpd.clip(slope_vec_gdf, unit)
+    # Use 3857 transform/crs
+    slope_vec_gdf = vectorize_raster(slope_mask_class, transform_3857, crs_3857, "slope_class", slope_props)
+    slope_vec_gdf = gpd.clip(slope_vec_gdf, unit.to_crs(crs_3857))
     
     # Apply Schema Validation/Projection
     slope_name = "slope_mask.geojson"
