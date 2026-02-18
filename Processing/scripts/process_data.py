@@ -328,6 +328,20 @@ def main(config):
         # Step 1: Standardize (Keys, Values)
         gdf = standardize_data(file, gdf, mapping_config)
         
+        # Specific logic for Public Lands - Hunting Allowed
+        if file.name == "public_lands.geojson":
+            print("  Calculating 'Hunting Allowed' field...")
+            # Allowed owners
+            allowed_owners = ["US Forest Service", "Montana Fish, Wildlife, and Parks", "Montana State Trust Lands"]
+            
+            if "Owner" in gdf.columns:
+                gdf["Hunting Allowed"] = gdf["Owner"].apply(
+                    lambda x: "Yes" if x in allowed_owners else "No"
+                )
+            else:
+                print("  WARNING: 'Owner' field not found, cannot calculate 'Hunting Allowed'")
+                gdf["Hunting Allowed"] = "Unknown"
+        
         # Intermediate: Geometry Ops
         if gdf is not None:
              gdf = geometry_ops.main(file, gdf)

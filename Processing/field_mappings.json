@@ -13,9 +13,7 @@
     "source": "Montana FWP Public Lands",
     "type": "polygon",
     "field_map": {
-      "SITETYPE": "owner_type",
-      "SITENAME": "agency",
-      "PUBLIC_ACCESS": "public_access"
+      "Owner": "Owner"
     },
     "value_maps": {}
   },
@@ -24,7 +22,8 @@
     "type": "polygon",
     "field_map": {
       "OwnerName": "Owner",
-      "TotalValue": "Total_Value"
+      "AddressLine1": "Address"
+
     },
     "value_maps": {}
   },

@@ -1,11 +1,11 @@
 unit:
-  District_ID: 423
+  District_ID: 102
   Species: bighorn_sheep
   buffer_distance_miles: 1.0
 
 steps:
   get_data: false
-  terrain_derivatives: true
+  terrain_derivatives: false
   process_data: true
   push_to_map: true
 
@@ -25,7 +25,7 @@ URLS:
     - name: "FS_Trails"
       url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_TrailNFSPublish_01/MapServer/0"
     - name: "Public_Lands"
-      url: "https://services3.arcgis.com/Cdxz8r11hT0MGzg1/arcgis/rest/services/FWPLND_FWPLANDS_PARCELS/FeatureServer/0"
+      url: "https://gisservicemt.gov/arcgis/rest/services/MSDI_Framework/PublicLands/MapServer/0"
     - name: "MT_Roads"
       url: "https://gisservicemt.gov/arcgis/rest/services/MSDI_Framework/MontanaTransportation/MapServer/0"
     - name: "distribution"

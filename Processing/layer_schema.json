@@ -12,9 +12,8 @@
         "crs": "EPSG:4326",
         "geometry": "Polygon",
         "fields": {
-            "owner_type": "str",
-            "agency": "str",
-            "public_access": "str"
+            "Owner": "str",
+            "Hunting Allowed": "str"
         }
     },
     "parcels.geojson": {
@@ -22,7 +21,7 @@
         "geometry": "Polygon",
         "fields": {
             "Owner": "str",
-            "Total_Value": "float"
+            "Address": "str"
         }
     },
     "mt_roads.geojson": {
