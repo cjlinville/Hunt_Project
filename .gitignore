@@ -3,7 +3,7 @@ Processing/Data
 Processing/venv
 .env
 Processing/scripts/__pycache__
-Data/
+
 node_modules/
 .DS_Store
 *.log

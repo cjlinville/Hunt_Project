@@ -146,7 +146,16 @@ const publicLandsLayer = {
     id: 'public-lands',
     type: 'fill' as const,
     paint: {
-        'fill-color': '#8b5cf6', // Violet-500
+        'fill-color': [
+            'match',
+            ['get', 'Owner'],
+            'US Forest Service', '#22c55e', // Green-500
+            'Montana Fish, Wildlife, and Parks', '#eab308', // Yellow-500
+            'Bureau of Land Management', '#f59e0b', // Amber-500
+            'State Trust Lands', '#3b82f6', // Blue-500
+            'National Park Service', '#a8a29e', // Stone-400
+            '#a855f7' // Default Purple-500
+        ] as any,
         'fill-opacity': 0.4,
         'fill-outline-color': '#6d28d9' // Violet-700
     }
@@ -304,6 +313,7 @@ export function MapComponent({
     const [measurementPoints, setMeasurementPoints] = useState<number[][]>([]);
     const [measurementUnit, setMeasurementUnit] = useState<'miles' | 'yards'>('miles');
     const [isStyleLoaded, setIsStyleLoaded] = useState(false);
+    const styleLoadTimer = useRef<any>(null);
     const [initialViewState, setInitialViewState] = useState({
         longitude: -114.85,
         latitude: 48.86,
@@ -356,6 +366,8 @@ export function MapComponent({
     }, []);
 
     const toggleMapStyle = () => {
+        if (styleLoadTimer.current) clearTimeout(styleLoadTimer.current);
+        setIsStyleLoaded(false);
         setMapStyle(mapStyle === STYLE_TERRAIN ? STYLE_SATELLITE : STYLE_TERRAIN);
     };
 
@@ -438,8 +450,19 @@ export function MapComponent({
                 }}
                 onStyleData={(e) => {
                     // When style finishes loading, dataType will be 'style'
+                    const map = (e as any).target;
                     if (e.dataType === 'style') {
-                        setIsStyleLoaded(true);
+                        // Only start timer if not already scheduled and state is not loaded
+                        if (!styleLoadTimer.current && !isStyleLoaded) {
+                            // Wait for stability (500ms)
+                            styleLoadTimer.current = setTimeout(() => {
+                                // Check if style is STILL loaded after delay
+                                if (map.isStyleLoaded()) {
+                                    setIsStyleLoaded(true);
+                                }
+                                styleLoadTimer.current = null;
+                            }, 500);
+                        }
                     }
                 }}
             >
